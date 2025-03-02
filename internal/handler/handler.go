@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"net/url"
 
 	"github.com/go-chi/chi/v5"
 
@@ -34,13 +33,7 @@ func (handler *URLHandler) ProcessPost(rsp http.ResponseWriter, rqs *http.Reques
 	log.Printf("Stored short URL: %s", shortURL)
 	rsp.WriteHeader(http.StatusCreated)
 
-	result := url.URL{
-		Scheme: "http",
-		Host:   fmt.Sprintf("%s:%d", handler.cfg.Host, handler.cfg.Port),
-		Path:   "/" + shortURL,
-	}
-
-	rsp.Write([]byte(result.String()))
+	rsp.Write([]byte(fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL)))
 }
 
 func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request) {

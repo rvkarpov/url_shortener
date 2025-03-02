@@ -17,9 +17,9 @@ func main() {
 	cfg := config.LoadConfig()
 	urlStorage := storage.NewStorage()
 	urlService := service.NewURLService(urlStorage)
-	handler := handler.NewURLHandler(urlService, &cfg)
+	handler := handler.NewURLHandler(urlService, cfg)
 
-	log.Printf("Server started on :%d\n", cfg.Port)
+	log.Printf("Server started on %s:%d\n", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)
 
 	router := chi.NewRouter()
 	router.Route("/", func(router chi.Router) {
@@ -27,5 +27,5 @@ func main() {
 		router.Get("/{URL}", handler.ProcessGet)
 	})
 
-	http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.Host, cfg.Port), router)
+	http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port), router)
 }
