@@ -5,6 +5,8 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/rvkarpov/url_shortener/internal/config"
 	"github.com/rvkarpov/url_shortener/internal/handler"
 	"github.com/rvkarpov/url_shortener/internal/service"
@@ -17,9 +19,13 @@ func main() {
 	urlService := service.NewURLService(urlStorage)
 	handler := handler.NewURLHandler(urlService, &cfg)
 
-	log.Printf("Server started on %s:%d\n", cfg.Host, cfg.Port)
+	log.Printf("Server started on :%d\n", cfg.Port)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc(`/`, handler.ProcessRqs)
-	http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.Host, cfg.Port), mux)
+	router := chi.NewRouter()
+	router.Route("/", func(router chi.Router) {
+		router.Post("/", handler.ProcessPost)
+		router.Get("/{URL}", handler.ProcessGet)
+	})
+
+	http.ListenAndServe(fmt.Sprintf("%s:%d", cfg.Host, cfg.Port), router)
 }
