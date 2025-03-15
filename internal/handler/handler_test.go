@@ -8,15 +8,15 @@ import (
 	"testing"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/rvkarpov/url_shortener/internal/config"
 	"github.com/rvkarpov/url_shortener/internal/mocks"
 	"github.com/rvkarpov/url_shortener/internal/service"
+	"github.com/rvkarpov/url_shortener/internal/testutils"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestGetHandler(t *testing.T) {
-	cfg := config.LoadConfig()
+	cfg := testutils.LoadTestConfig()
 	storage := mocks.NewStorageMock()
 	storage.AddTestData("oeapEa", "https://www.foo.com")
 
@@ -91,7 +91,7 @@ func TestGetHandler(t *testing.T) {
 }
 
 func TestPostHandler(t *testing.T) {
-	cfg := config.LoadConfig()
+	cfg := testutils.LoadTestConfig()
 	storage := mocks.NewStorageMock()
 
 	type want struct {

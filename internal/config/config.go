@@ -1,10 +1,21 @@
 package config
 
+import (
+	"flag"
+)
+
 type Config struct {
-	Host string
-	Port uint16
+	LaunchAddr  NetAddress
+	PublishAddr string
 }
 
-func LoadConfig() Config {
-	return Config{Host: "localhost", Port: 8080}
+func LoadConfig() *Config {
+	var publishAddr VerifiedURL = "http://localhost:8080"
+	flag.Var(&publishAddr, "b", "Result base address (format: valid URL)")
+
+	launchAddr := NewNetAddress()
+	flag.Var(&launchAddr, "a", "Launch address (format: host:port)")
+	flag.Parse()
+
+	return &Config{LaunchAddr: launchAddr, PublishAddr: string(publishAddr)}
 }
