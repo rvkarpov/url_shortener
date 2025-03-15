@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/rvkarpov/url_shortener/internal/config"
 	"github.com/rvkarpov/url_shortener/internal/service"
 	"github.com/rvkarpov/url_shortener/internal/urlutils"
@@ -20,18 +22,7 @@ func NewURLHandler(urlService_ *service.URLService, cfg_ *config.Config) *URLHan
 	return &URLHandler{urlService: urlService_, cfg: cfg_}
 }
 
-func (handler *URLHandler) ProcessRqs(rsp http.ResponseWriter, rqs *http.Request) {
-	switch rqs.Method {
-	case http.MethodPost:
-		handler.processPost(rsp, rqs)
-	case http.MethodGet:
-		handler.processGet(rsp, rqs)
-	default:
-		http.Error(rsp, "Method not allowed", http.StatusBadRequest)
-	}
-}
-
-func (handler *URLHandler) processPost(rsp http.ResponseWriter, rqs *http.Request) {
+func (handler *URLHandler) ProcessPost(rsp http.ResponseWriter, rqs *http.Request) {
 	recvURL, err := urlutils.TryGetURLFromPostRqs(rqs)
 	log.Printf("New POST request with URL: %s", recvURL)
 	if err != nil {
@@ -52,13 +43,10 @@ func (handler *URLHandler) processPost(rsp http.ResponseWriter, rqs *http.Reques
 	rsp.Write([]byte(result.String()))
 }
 
-func (handler *URLHandler) processGet(rsp http.ResponseWriter, rqs *http.Request) {
-	log.Println("New GET request")
-	recvURL, err := urlutils.TryGetURLFromGetRqs(rqs)
-
-	if err != nil {
-		http.Error(rsp, err.Error(), http.StatusBadRequest)
-		return
+func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request) {
+	recvURL := chi.URLParam(rqs, "URL")
+	if len(recvURL) == 0 {
+		http.Error(rsp, "a non-empty path is expected", http.StatusBadRequest)
 	}
 
 	log.Printf("New GET request with short URL: %s", recvURL)

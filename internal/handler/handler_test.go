@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/rvkarpov/url_shortener/internal/config"
 	"github.com/rvkarpov/url_shortener/internal/mocks"
 	"github.com/rvkarpov/url_shortener/internal/service"
@@ -60,9 +61,9 @@ func TestGetHandler(t *testing.T) {
 			name: "empty path",
 			rqs:  "/",
 			want: want{
-				code:     400,
+				code:     404,
 				location: "",
-				rsp:      "a non-empty path is expected\n",
+				rsp:      "404 page not found\n",
 			},
 		},
 	}
@@ -71,11 +72,14 @@ func TestGetHandler(t *testing.T) {
 			urlService := service.NewURLService(storage)
 			handler := NewURLHandler(urlService, &cfg)
 
-			rqs := httptest.NewRequest(http.MethodGet, test.rqs, nil)
-			w := httptest.NewRecorder()
-			handler.ProcessRqs(w, rqs)
+			router := chi.NewRouter()
+			router.Get("/{URL}", handler.ProcessGet)
 
-			res := w.Result()
+			rqs := httptest.NewRequest(http.MethodGet, test.rqs, nil)
+			rsp := httptest.NewRecorder()
+			router.ServeHTTP(rsp, rqs)
+
+			res := rsp.Result()
 			defer res.Body.Close()
 
 			assert.Equal(t, test.want.code, res.StatusCode)
@@ -129,11 +133,14 @@ func TestPostHandler(t *testing.T) {
 			urlService := service.NewURLService(storage)
 			handler := NewURLHandler(urlService, &cfg)
 
-			rqs := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.rqsData))
-			w := httptest.NewRecorder()
-			handler.ProcessRqs(w, rqs)
+			router := chi.NewRouter()
+			router.Post("/", handler.ProcessPost)
 
-			res := w.Result()
+			rqs := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.rqsData))
+			rsp := httptest.NewRecorder()
+			router.ServeHTTP(rsp, rqs)
+
+			res := rsp.Result()
 			defer res.Body.Close()
 
 			assert.Equal(t, test.want.code, res.StatusCode)

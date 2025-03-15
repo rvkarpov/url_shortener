@@ -31,13 +31,3 @@ func TryGetURLFromPostRqs(rqs *http.Request) (string, error) {
 
 	return tryParseURL(string(body))
 }
-
-func TryGetURLFromGetRqs(rqs *http.Request) (string, error) {
-	path := strings.TrimPrefix(rqs.URL.Path, "/")
-
-	if len(path) == 0 {
-		return "", errors.New("a non-empty path is expected")
-	}
-
-	return path, nil
-}
