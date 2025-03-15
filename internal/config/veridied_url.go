@@ -15,3 +15,7 @@ func (addr *VerifiedURL) Set(value string) error {
 	_, err := url.ParseRequestURI(value)
 	return err
 }
+
+func (addr *VerifiedURL) UnmarshalText(text []byte) error {
+	return addr.Set(string(text))
+}

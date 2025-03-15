@@ -1,9 +1,9 @@
 package config
 
 import (
-	"errors"
+	"fmt"
+	"net"
 	"strconv"
-	"strings"
 )
 
 type NetAddress struct {
@@ -20,18 +20,22 @@ func (addr NetAddress) String() string {
 }
 
 func (addr *NetAddress) Set(value string) error {
-	hp := strings.Split(value, ":")
-	if len(hp) != 2 {
-		return errors.New("address in a form host:port required")
-	}
-
-	port, err := strconv.Atoi(hp[1])
+	host, port_, err := net.SplitHostPort(value)
 	if err != nil {
-		return err
+		return fmt.Errorf("address in a form host:port required")
 	}
 
-	addr.Host = hp[0]
+	port, err := strconv.Atoi(port_)
+	if err != nil {
+		return fmt.Errorf("an integer value is expected as the port value")
+	}
+
+	addr.Host = host
 	addr.Port = port
 
 	return nil
+}
+
+func (addr *NetAddress) UnmarshalText(text []byte) error {
+	return addr.Set(string(text))
 }
