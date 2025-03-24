@@ -23,7 +23,12 @@ func main() {
 	logger := logger_.Sugar()
 
 	cfg := config.LoadConfig()
-	urlStorage := storage.NewStorage()
+	urlStorage, err := storage.NewStorage(cfg.StorageFile)
+	if err != nil {
+		logger.Fatalw(err.Error(), "event", "load storage")
+	}
+	defer urlStorage.Finalize()
+
 	urlService := service.NewURLService(urlStorage)
 	handler := handler.NewURLHandler(urlService, cfg)
 

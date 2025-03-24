@@ -17,8 +17,9 @@ type Mock struct {
 	urls map[string]string
 }
 
-func (m *Mock) StoreURL(shortURL, longURL string) {
+func (m *Mock) StoreURL(shortURL, longURL string) error {
 	m.urls[shortURL] = longURL
+	return nil
 }
 
 func (m *Mock) TryGetLongURL(shortURL string) (string, error) {
@@ -28,6 +29,9 @@ func (m *Mock) TryGetLongURL(shortURL string) (string, error) {
 	}
 
 	return originalURL, nil
+}
+
+func (m *Mock) Finalize() {
 }
 
 func (m *Mock) AddTestData(shortURL, longURL string) {
