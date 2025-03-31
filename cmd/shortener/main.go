@@ -29,9 +29,9 @@ func main() {
 
 	logger.Infof("Server started on %s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)
 
-	handlePostString := middleware.Log(handler.ProcessPostCommon, logger)
-	handlePostObject := middleware.Log(handler.ProcessPostObject, logger)
-	handleGet := middleware.Log(handler.ProcessGet, logger)
+	handlePostString := middleware.Compress(middleware.Log(handler.ProcessPostCommon, logger))
+	handlePostObject := middleware.Compress(middleware.Log(handler.ProcessPostObject, logger))
+	handleGet := middleware.Compress(middleware.Log(handler.ProcessGet, logger))
 
 	router := chi.NewRouter()
 	router.Route("/", func(router chi.Router) {
