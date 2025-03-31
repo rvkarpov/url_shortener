@@ -31,10 +31,14 @@ func (handler *URLHandler) ProcessPostCommon(rsp http.ResponseWriter, rqs *http.
 		return
 	}
 
-	shortURL := handler.urlService.ProcessLongURL(recvURL)
+	shortURL, err := handler.urlService.ProcessLongURL(recvURL)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	log.Printf("Stored short URL: %s", shortURL)
 	rsp.WriteHeader(http.StatusCreated)
-
 	rsp.Write([]byte(fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL)))
 }
 
@@ -60,9 +64,15 @@ func (handler *URLHandler) ProcessPostObject(rsp http.ResponseWriter, rqs *http.
 		http.Error(rsp, "url not specified", http.StatusBadRequest)
 		return
 	}
+
 	log.Printf("New POST request with URL: %s", origin.URL)
 
-	shortURL := handler.urlService.ProcessLongURL(origin.URL)
+	shortURL, err := handler.urlService.ProcessLongURL(origin.URL)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	log.Printf("Stored short URL: %s", shortURL)
 
 	short := ShortURLInfo{
