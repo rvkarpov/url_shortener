@@ -29,12 +29,14 @@ func main() {
 
 	logger.Infof("Server started on %s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)
 
-	handlePost := middleware.Log(handler.ProcessPost, logger)
+	handlePostString := middleware.Log(handler.ProcessPostCommon, logger)
+	handlePostObject := middleware.Log(handler.ProcessPostObject, logger)
 	handleGet := middleware.Log(handler.ProcessGet, logger)
 
 	router := chi.NewRouter()
 	router.Route("/", func(router chi.Router) {
-		router.Post("/", handlePost)
+		router.Post("/", handlePostString)
+		router.Post("/api/shorten", handlePostObject)
 		router.Get("/{URL}", handleGet)
 	})
 

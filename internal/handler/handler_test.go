@@ -90,7 +90,7 @@ func TestGetHandler(t *testing.T) {
 	}
 }
 
-func TestPostHandler(t *testing.T) {
+func TestPostCommonHandler(t *testing.T) {
 	cfg := testutils.LoadTestConfig()
 	storage := mocks.NewStorageMock()
 
@@ -134,9 +134,93 @@ func TestPostHandler(t *testing.T) {
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()
-			router.Post("/", handler.ProcessPost)
+			router.Post("/", handler.ProcessPostCommon)
 
 			rqs := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.rqsData))
+			rsp := httptest.NewRecorder()
+			router.ServeHTTP(rsp, rqs)
+
+			res := rsp.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, test.want.code, res.StatusCode)
+			resBody, _ := io.ReadAll(res.Body)
+			assert.Equal(t, test.want.rsp, string(resBody))
+		})
+	}
+}
+
+func TestPostObjectHandler(t *testing.T) {
+	cfg := testutils.LoadTestConfig()
+	storage := mocks.NewStorageMock()
+
+	type want struct {
+		code int
+		rsp  string
+	}
+	tests := []struct {
+		name        string
+		rqsData     string
+		contentType string
+		want        want
+	}{
+		{
+			name:        "common",
+			rqsData:     `{"url":"https://www.foo.com"}`,
+			contentType: "application/json",
+			want: want{
+				code: 201,
+				rsp:  `{"result":"http://localhost:8080/6ySFbLgd"}`,
+			},
+		},
+		{
+			name:        `no "url" key`,
+			rqsData:     `{"unknown_key" : "https://www.foo.com"}`,
+			contentType: "application/json",
+			want: want{
+				code: 400,
+				rsp:  "url not specified\n",
+			},
+		},
+		{
+			name:        "invalid json",
+			rqsData:     `{"https://www.foo.com"}`,
+			contentType: "application/json",
+			want: want{
+				code: 400,
+				rsp:  "invalid json\n",
+			},
+		},
+		{
+			name:        "empty obj",
+			contentType: "application/json",
+			rqsData:     "",
+			want: want{
+				code: 400,
+				rsp:  "invalid json\n",
+			},
+		},
+		{
+			name:        "not json",
+			rqsData:     "bar",
+			contentType: "plain/text",
+			want: want{
+				code: 400,
+				rsp:  "incorrect content type\n",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			urlService := service.NewURLService(storage)
+			handler := NewURLHandler(urlService, &cfg)
+
+			router := chi.NewRouter()
+			router.Post("/api/shorten", handler.ProcessPostObject)
+
+			rqs := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(test.rqsData))
+			rqs.Header.Set("Content-Type", test.contentType)
+
 			rsp := httptest.NewRecorder()
 			router.ServeHTTP(rsp, rqs)
 
