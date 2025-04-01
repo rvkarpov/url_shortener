@@ -11,6 +11,7 @@ import (
 
 	"github.com/rvkarpov/url_shortener/internal/config"
 	"github.com/rvkarpov/url_shortener/internal/service"
+	"github.com/rvkarpov/url_shortener/internal/storage"
 	"github.com/rvkarpov/url_shortener/internal/urlutils"
 )
 
@@ -105,4 +106,22 @@ func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request
 
 	rsp.Header().Set("Location", longURL)
 	rsp.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (handler *URLHandler) ProcessPing(db storage.DBstate) http.HandlerFunc {
+	return func(rsp http.ResponseWriter, rqs *http.Request) {
+		if !db.Enabled {
+			http.Error(rsp, "DB disabled", http.StatusInternalServerError)
+			return
+		}
+
+		err := db.DB.Ping()
+		if err != nil {
+			http.Error(rsp, fmt.Sprintf("DB connection error: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		rsp.Write([]byte("DB connection OK"))
+		rsp.WriteHeader(http.StatusOK)
+	}
 }
