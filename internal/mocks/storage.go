@@ -7,7 +7,7 @@ import (
 )
 
 type MockStorage interface {
-	storage.Storage
+	storage.URLStorage
 	AddTestData(shortURL, longURL string)
 }
 
