@@ -9,18 +9,18 @@ import (
 	"strconv"
 )
 
-type Storage struct {
+type FileStorage struct {
 	urls   map[string]string
 	file   *os.File
 	writer *bufio.Writer
 }
 
-func (storage *Storage) StoreURL(shortURL, longURL string) error {
+func (storage *FileStorage) StoreURL(shortURL, longURL string) error {
 	storage.urls[shortURL] = longURL
 	return storage.writeItem(shortURL, longURL)
 }
 
-func (storage *Storage) TryGetLongURL(shortURL string) (string, error) {
+func (storage *FileStorage) TryGetLongURL(shortURL string) (string, error) {
 	originalURL, exists := storage.urls[shortURL]
 	if !exists {
 		return "", errors.New("URL not found")
@@ -29,7 +29,7 @@ func (storage *Storage) TryGetLongURL(shortURL string) (string, error) {
 	return originalURL, nil
 }
 
-func (storage *Storage) Finalize() {
+func (storage *FileStorage) Finalize() {
 	storage.writer.Flush()
 	storage.file.Close()
 }
@@ -40,7 +40,7 @@ type StorageItem struct {
 	OriginalURL string `json:"original_url"`
 }
 
-func (storage *Storage) writeItem(shortURL, longURL string) error {
+func (storage *FileStorage) writeItem(shortURL, longURL string) error {
 	item := StorageItem{
 		UUID:        strconv.Itoa(len(storage.urls)),
 		ShortURL:    shortURL,
@@ -63,7 +63,7 @@ func (storage *Storage) writeItem(shortURL, longURL string) error {
 	return storage.writer.Flush()
 }
 
-func NewStorage(filepath string) (*Storage, error) {
+func NewFileStorage(filepath string) (*FileStorage, error) {
 	file, err := os.OpenFile(filepath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err
@@ -83,5 +83,5 @@ func NewStorage(filepath string) (*Storage, error) {
 		urls[item.ShortURL] = item.OriginalURL
 	}
 
-	return &Storage{urls: urls, file: file, writer: bufio.NewWriter(file)}, nil
+	return &FileStorage{urls: urls, file: file, writer: bufio.NewWriter(file)}, nil
 }
