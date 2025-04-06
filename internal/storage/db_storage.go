@@ -11,27 +11,27 @@ import (
 )
 
 type DBState struct {
-	DB      *sql.DB
-	Enabled bool
+	DB *sql.DB
+	Tx *sql.Tx
 }
 
 func (state *DBState) Close() {
-	if state.Enabled {
+	if state.DB != nil {
 		state.DB.Close()
 	}
 }
 
 func ConnectToDB(connParams string) DBState {
 	if connParams == "" {
-		return DBState{DB: nil, Enabled: false}
+		return DBState{DB: nil, Tx: nil}
 	}
 
 	db, err := sql.Open("postgres", connParams)
 	if err != nil {
-		return DBState{DB: nil, Enabled: false}
+		return DBState{DB: nil, Tx: nil}
 	}
 
-	return DBState{DB: db, Enabled: true}
+	return DBState{DB: db, Tx: nil}
 }
 
 type DBStorage struct {
@@ -39,18 +39,37 @@ type DBStorage struct {
 	cfg   config.Config
 }
 
-func (storage *DBStorage) StoreURL(shortURL, longURL string) error {
+func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
 	query := fmt.Sprintf(
 		`INSERT INTO %s (longURL, shortURL) VALUES ($1, $2)`,
 		pq.QuoteIdentifier(storage.cfg.TableName),
 	)
 
-	_, err := storage.state.DB.ExecContext(
-		context.Background(),
-		query,
-		longURL,
-		shortURL,
-	)
+	var err error
+
+	if storage.state.Tx != nil {
+		_, err = storage.state.Tx.ExecContext(
+			ctx,
+			query,
+			longURL,
+			shortURL,
+		)
+
+		if err != nil {
+			if rollbackErr := storage.state.Tx.Rollback(); rollbackErr != nil {
+				storage.state.Tx = nil
+				return fmt.Errorf("failed to insert URL: %v, rollback: %v", err, rollbackErr)
+			}
+		}
+
+	} else {
+		_, err = storage.state.DB.ExecContext(
+			ctx,
+			query,
+			longURL,
+			shortURL,
+		)
+	}
 
 	if err != nil {
 		return fmt.Errorf("failed to insert URL: %w", err)
@@ -58,7 +77,7 @@ func (storage *DBStorage) StoreURL(shortURL, longURL string) error {
 	return nil
 }
 
-func (storage *DBStorage) TryGetLongURL(shortURL string) (string, error) {
+func (storage *DBStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, error) {
 	query := fmt.Sprintf(
 		`SELECT longURL FROM %s WHERE shortURL = $1 LIMIT 1`,
 		pq.QuoteIdentifier(storage.cfg.TableName),
@@ -66,7 +85,7 @@ func (storage *DBStorage) TryGetLongURL(shortURL string) (string, error) {
 
 	var longURL string
 	err := storage.state.DB.QueryRowContext(
-		context.Background(),
+		ctx,
 		query,
 		shortURL,
 	).Scan(&longURL)
@@ -84,8 +103,35 @@ func (storage *DBStorage) TryGetLongURL(shortURL string) (string, error) {
 func (storage *DBStorage) Finalize() {
 }
 
+func (storage *DBStorage) BeginTransaction(ctx context.Context) error {
+	tx, err := storage.state.DB.Begin()
+	if err != nil {
+		return err
+	}
+
+	storage.state.Tx = tx
+	return nil
+}
+
+func (storage *DBStorage) EndTransaction(ctx context.Context) error {
+	if storage.state.Tx == nil {
+		return nil
+	}
+
+	err := storage.state.Tx.Commit()
+	if err != nil {
+		if rollbackErr := storage.state.Tx.Rollback(); rollbackErr != nil {
+			storage.state.Tx = nil
+			return fmt.Errorf("commit failed: %v, rollback: %v", err, rollbackErr)
+		}
+	}
+
+	storage.state.Tx = nil
+	return nil
+}
+
 func NewDBStorage(state *DBState, cfg config.Config) (*DBStorage, error) {
-	if !state.Enabled {
+	if state.DB == nil {
 		return nil, errors.New("database is not available")
 	}
 

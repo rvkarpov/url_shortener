@@ -2,6 +2,7 @@ package storage
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -15,12 +16,12 @@ type FileStorage struct {
 	writer *bufio.Writer
 }
 
-func (storage *FileStorage) StoreURL(shortURL, longURL string) error {
+func (storage *FileStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
 	storage.urls[shortURL] = longURL
 	return storage.writeItem(shortURL, longURL)
 }
 
-func (storage *FileStorage) TryGetLongURL(shortURL string) (string, error) {
+func (storage *FileStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, error) {
 	originalURL, exists := storage.urls[shortURL]
 	if !exists {
 		return "", errors.New("URL not found")
@@ -61,6 +62,14 @@ func (storage *FileStorage) writeItem(shortURL, longURL string) error {
 	}
 
 	return storage.writer.Flush()
+}
+
+func (storage *FileStorage) BeginTransaction(ctx context.Context) error {
+	return nil
+}
+
+func (storage *FileStorage) EndTransaction(ctx context.Context) error {
+	return nil
 }
 
 func NewFileStorage(filepath string) (*FileStorage, error) {
