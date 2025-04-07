@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -36,7 +37,15 @@ func (handler *URLHandler) ProcessPostURLString(rsp http.ResponseWriter, rqs *ht
 
 	shortURL, err := handler.urlService.ProcessLongURL(ctx, recvURL)
 	if err != nil {
-		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		var dupErr *storage.DuplicateURLError
+		if errors.As(err, &dupErr) {
+			log.Printf("Duplicate URL found: %s", shortURL)
+			rsp.WriteHeader(http.StatusConflict)
+			rsp.Write([]byte(fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL)))
+		} else {
+			http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		}
+
 		return
 	}
 
@@ -74,21 +83,33 @@ func (handler *URLHandler) ProcessPostURLObject(rsp http.ResponseWriter, rqs *ht
 
 	shortURL, err := handler.urlService.ProcessLongURL(ctx, origin.URL)
 	if err != nil {
-		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		var dupErr *storage.DuplicateURLError
+		if errors.As(err, &dupErr) {
+			log.Printf("Duplicate URL found: %s", shortURL)
+			handler.publishURLObject(rsp, shortURL, http.StatusConflict)
+		} else {
+			http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		}
+
 		return
 	}
 
 	log.Printf("Stored short URL: %s", shortURL)
+	handler.publishURLObject(rsp, shortURL, http.StatusCreated)
+}
+
+func (handler *URLHandler) publishURLObject(rsp http.ResponseWriter, shortURL string, status int) {
 	short := ShortURLInfo{
 		Result: fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL),
 	}
 	out, err := json.Marshal(short)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	rsp.Header().Add("Content-Type", "application/json")
-	rsp.WriteHeader(http.StatusCreated)
+	rsp.WriteHeader(status)
 	rsp.Write(out)
 }
 
@@ -132,7 +153,27 @@ func (handler *URLHandler) ProcessPostURLBatch(rsp http.ResponseWriter, rqs *htt
 		log.Printf("New POST request with URL: %s", item.URL)
 		shortURL, err := handler.urlService.ProcessLongURL(ctx, item.URL)
 		if err != nil {
-			http.Error(rsp, err.Error(), http.StatusInternalServerError)
+			var dupErr *storage.DuplicateURLError
+			if errors.As(err, &dupErr) {
+				log.Printf("Duplicate URL found: %s", shortURL)
+
+				item := ShortURLBatchItem{
+					ID:  item.ID,
+					URL: fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL),
+				}
+
+				out, err := json.Marshal(item)
+				if err != nil {
+					http.Error(rsp, err.Error(), http.StatusInternalServerError)
+				}
+
+				rsp.Header().Add("Content-Type", "application/json")
+				rsp.WriteHeader(http.StatusConflict)
+				rsp.Write(out)
+			} else {
+				http.Error(rsp, err.Error(), http.StatusInternalServerError)
+			}
+
 			return
 		}
 

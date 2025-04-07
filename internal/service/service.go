@@ -3,16 +3,18 @@ package service
 import (
 	"context"
 
+	"github.com/rvkarpov/url_shortener/internal/config"
 	"github.com/rvkarpov/url_shortener/internal/storage"
 	"github.com/rvkarpov/url_shortener/internal/urlutils"
 )
 
 type URLService struct {
 	urlStorage storage.URLStorage
+	cfg        *config.Config
 }
 
-func NewURLService(urlStorage_ storage.URLStorage) *URLService {
-	return &URLService{urlStorage: urlStorage_}
+func NewURLService(urlStorage storage.URLStorage, cfg *config.Config) *URLService {
+	return &URLService{urlStorage: urlStorage, cfg: cfg}
 }
 
 func (service *URLService) BeginBatchProcessing(ctx context.Context) error {
@@ -24,7 +26,7 @@ func (service *URLService) EndBatchProcessing(ctx context.Context) error {
 }
 
 func (service *URLService) ProcessLongURL(ctx context.Context, longURL string) (string, error) {
-	shortURL := urlutils.GenerateShortURL(longURL)
+	shortURL := urlutils.GenerateShortURL(longURL, service.cfg.ShortURLLen)
 	err := service.urlStorage.StoreURL(ctx, shortURL, longURL)
 	return shortURL, err
 }

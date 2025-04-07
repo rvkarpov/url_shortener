@@ -88,7 +88,7 @@ func TestPostObjectHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			urlService := service.NewURLService(storage)
+			urlService := service.NewURLService(storage, &cfg)
 
 			handler := handler.NewURLHandler(urlService, &cfg)
 			router := chi.NewRouter()

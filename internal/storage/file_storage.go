@@ -17,6 +17,11 @@ type FileStorage struct {
 }
 
 func (storage *FileStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
+	_, exists := storage.urls[shortURL]
+	if exists {
+		return NewDuplicateURLError(shortURL)
+	}
+
 	storage.urls[shortURL] = longURL
 	return storage.writeItem(shortURL, longURL)
 }
