@@ -88,11 +88,11 @@ func TestPostObjectHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			urlService := service.NewURLService(storage)
+			urlService := service.NewURLService(storage, &cfg)
 
 			handler := handler.NewURLHandler(urlService, &cfg)
 			router := chi.NewRouter()
-			router.Post("/api/shorten", Compress(handler.ProcessPostObject))
+			router.Post("/api/shorten", Compress(handler.ProcessPostURLObject))
 
 			rqs := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(test.rqsData))
 			rqs.Header.Set("Content-Type", test.contentType)

@@ -5,5 +5,9 @@ import (
 )
 
 func LoadTestConfig() config.Config {
-	return config.Config{LaunchAddr: config.NewNetAddress(), PublishAddr: "http://localhost:8080"}
+	return config.Config{
+		LaunchAddr:  config.NewNetAddress(),
+		PublishAddr: "http://localhost:8080",
+		ShortURLLen: 8,
+	}
 }
