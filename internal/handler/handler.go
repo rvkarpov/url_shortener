@@ -37,8 +37,7 @@ func (handler *URLHandler) ProcessPostURLString(rsp http.ResponseWriter, rqs *ht
 
 	shortURL, err := handler.urlService.ProcessLongURL(ctx, recvURL)
 	if err != nil {
-		var dupErr *storage.DuplicateURLError
-		if errors.As(err, &dupErr) {
+		if errors.Is(err, &storage.DuplicateURLError{}) {
 			log.Printf("Duplicate URL found: %s", shortURL)
 			rsp.WriteHeader(http.StatusConflict)
 			rsp.Write([]byte(fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL)))
@@ -83,8 +82,7 @@ func (handler *URLHandler) ProcessPostURLObject(rsp http.ResponseWriter, rqs *ht
 
 	shortURL, err := handler.urlService.ProcessLongURL(ctx, origin.URL)
 	if err != nil {
-		var dupErr *storage.DuplicateURLError
-		if errors.As(err, &dupErr) {
+		if errors.Is(err, &storage.DuplicateURLError{}) {
 			log.Printf("Duplicate URL found: %s", shortURL)
 			handler.publishURLObject(rsp, shortURL, http.StatusConflict)
 		} else {
@@ -153,8 +151,7 @@ func (handler *URLHandler) ProcessPostURLBatch(rsp http.ResponseWriter, rqs *htt
 		log.Printf("New POST request with URL: %s", item.URL)
 		shortURL, err := handler.urlService.ProcessLongURL(ctx, item.URL)
 		if err != nil {
-			var dupErr *storage.DuplicateURLError
-			if errors.As(err, &dupErr) {
+			if errors.Is(err, &storage.DuplicateURLError{}) {
 				log.Printf("Duplicate URL found: %s", shortURL)
 
 				item := ShortURLBatchItem{
