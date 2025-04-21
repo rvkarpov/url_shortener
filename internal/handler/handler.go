@@ -2,7 +2,6 @@ package handler
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -27,7 +26,7 @@ func NewURLHandler(urlService_ *service.URLService, cfg_ *config.Config) *URLHan
 }
 
 func (handler *URLHandler) ProcessPostURLString(rsp http.ResponseWriter, rqs *http.Request) {
-	ctx := context.Background()
+	ctx := rqs.Context()
 	recvURL, err := urlutils.TryGetURLFromPostRqs(rqs)
 	log.Printf("New POST request with URL: %s", recvURL)
 	if err != nil {
@@ -54,7 +53,7 @@ func (handler *URLHandler) ProcessPostURLString(rsp http.ResponseWriter, rqs *ht
 }
 
 func (handler *URLHandler) ProcessPostURLObject(rsp http.ResponseWriter, rqs *http.Request) {
-	ctx := context.Background()
+	ctx := rqs.Context()
 
 	if rqs.Header.Get("Content-Type") != "application/json" {
 		http.Error(rsp, "incorrect content type", http.StatusBadRequest)
@@ -112,7 +111,7 @@ func (handler *URLHandler) publishURLObject(rsp http.ResponseWriter, shortURL st
 }
 
 func (handler *URLHandler) ProcessPostURLBatch(rsp http.ResponseWriter, rqs *http.Request) {
-	ctx := context.Background()
+	ctx := rqs.Context()
 
 	if rqs.Header.Get("Content-Type") != "application/json" {
 		http.Error(rsp, "incorrect content type", http.StatusBadRequest)
@@ -215,6 +214,19 @@ func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request
 	log.Printf("Found original URL: %s", longURL)
 	rsp.Header().Set("Location", longURL)
 	rsp.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (handler *URLHandler) ProcessGetSummary(rsp http.ResponseWriter, rqs *http.Request) {
+	summary := handler.urlService.GetSummary(rqs.Context())
+
+	if summary == "" {
+		rsp.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	rsp.Header().Add("Content-Type", "application/json")
+	rsp.WriteHeader(http.StatusOK)
+	rsp.Write([]byte(summary))
 }
 
 func (handler *URLHandler) ProcessPing(db storage.DBState) http.HandlerFunc {

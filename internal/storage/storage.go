@@ -13,12 +13,14 @@ type URLStorage interface {
 
 	BeginTransaction(ctx context.Context) error
 	EndTransaction(ctx context.Context) error
+
+	GetSummary(ctx context.Context) string
 }
 
-func NewURLStorage(dbState *DBState, cfg config.Config) (URLStorage, error) {
+func NewURLStorage(dbState *DBState, cfg *config.Config) (URLStorage, error) {
 	if dbState.DB != nil {
 		return NewDBStorage(dbState, cfg)
 	}
 
-	return NewFileStorage(cfg.StorageFile)
+	return NewFileStorage(cfg)
 }

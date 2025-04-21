@@ -8,12 +8,15 @@ import (
 	"io"
 	"os"
 	"strconv"
+
+	"github.com/rvkarpov/url_shortener/internal/config"
 )
 
 type FileStorage struct {
-	urls   map[string]string
-	file   *os.File
-	writer *bufio.Writer
+	urls     map[string]string
+	file     *os.File
+	writer   *bufio.Writer
+	userData *UserDataStorage
 }
 
 func (storage *FileStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
@@ -22,8 +25,18 @@ func (storage *FileStorage) StoreURL(ctx context.Context, shortURL, longURL stri
 		return NewDuplicateURLError(shortURL)
 	}
 
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return err
+	}
+
 	storage.urls[shortURL] = longURL
-	return storage.writeItem(shortURL, longURL)
+	if err := storage.writeItem(userID, shortURL, longURL); err != nil {
+		return err
+	}
+
+	storage.userData.append(userID, longURL, shortURL)
+	return nil
 }
 
 func (storage *FileStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, error) {
@@ -41,14 +54,16 @@ func (storage *FileStorage) Finalize() {
 }
 
 type StorageItem struct {
-	UUID        string `json:"uuid"`
+	ItemID      string `json:"item_id"`
+	UserID      string `json:"user_id"`
 	ShortURL    string `json:"short_url"`
 	OriginalURL string `json:"original_url"`
 }
 
-func (storage *FileStorage) writeItem(shortURL, longURL string) error {
+func (storage *FileStorage) writeItem(userID, shortURL, longURL string) error {
 	item := StorageItem{
-		UUID:        strconv.Itoa(len(storage.urls)),
+		ItemID:      strconv.Itoa(len(storage.urls)),
+		UserID:      userID,
 		ShortURL:    shortURL,
 		OriginalURL: longURL,
 	}
@@ -77,13 +92,19 @@ func (storage *FileStorage) EndTransaction(ctx context.Context) error {
 	return nil
 }
 
-func NewFileStorage(filepath string) (*FileStorage, error) {
-	file, err := os.OpenFile(filepath, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
+func (storage *FileStorage) GetSummary(ctx context.Context) string {
+	return storage.userData.getSummary(ctx)
+}
+
+func NewFileStorage(cfg *config.Config) (*FileStorage, error) {
+	file, err := os.OpenFile(cfg.StorageFile, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err
 	}
 
 	urls := make(map[string]string)
+	userData := NewUserDataStorage(cfg)
+
 	decoder := json.NewDecoder(file)
 	var item StorageItem
 	for {
@@ -95,7 +116,8 @@ func NewFileStorage(filepath string) (*FileStorage, error) {
 		}
 
 		urls[item.ShortURL] = item.OriginalURL
+		userData.append(item.UserID, item.OriginalURL, item.ShortURL)
 	}
 
-	return &FileStorage{urls: urls, file: file, writer: bufio.NewWriter(file)}, nil
+	return &FileStorage{urls: urls, file: file, writer: bufio.NewWriter(file), userData: userData}, nil
 }
