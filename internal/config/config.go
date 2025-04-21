@@ -12,11 +12,16 @@ type Config struct {
 	PublishAddr  VerifiedURL `env:"BASE_URL"`
 	StorageFile  string      `env:"FILE_STORAGE_PATH"`
 	DBConnParams string      `env:"DATABASE_DSN"`
+	TableName    string
+	ShortURLLen  int8
 }
 
 func LoadConfig() *Config {
 	log.Printf("Reading environment variables")
-	cfg := &Config{LaunchAddr: NewNetAddress(), PublishAddr: "http://localhost:8080"}
+	cfg := &Config{LaunchAddr: NewNetAddress(),
+		PublishAddr: "http://localhost:8080",
+		TableName:   "urls",
+		ShortURLLen: 8}
 
 	flag.Var(&cfg.LaunchAddr, "a", "Launch address (format: host:port)")
 	flag.Var(&cfg.PublishAddr, "b", "Result base address (format: valid URL)")

@@ -98,17 +98,16 @@ func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request
 	log.Printf("New GET request with short URL: %s", recvURL)
 
 	longURL, err := handler.urlService.ProcessShortURL(recvURL)
-	log.Printf("Found original URL: %s", longURL)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusBadRequest)
 		return
 	}
-
+	log.Printf("Found original URL: %s", longURL)
 	rsp.Header().Set("Location", longURL)
 	rsp.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (handler *URLHandler) ProcessPing(db storage.DBstate) http.HandlerFunc {
+func (handler *URLHandler) ProcessPing(db storage.DBState) http.HandlerFunc {
 	return func(rsp http.ResponseWriter, rqs *http.Request) {
 		if !db.Enabled {
 			http.Error(rsp, "DB disabled", http.StatusInternalServerError)

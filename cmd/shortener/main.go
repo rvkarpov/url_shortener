@@ -23,14 +23,15 @@ func main() {
 	logger := logger_.Sugar()
 
 	cfg := config.LoadConfig()
-	urlStorage, err := storage.NewStorage(cfg.StorageFile)
+
+	db := storage.ConnectToDB(cfg.DBConnParams)
+	defer db.Close()
+
+	urlStorage, err := storage.NewURLStorage(&db, *cfg)
 	if err != nil {
-		logger.Fatalw(err.Error(), "event", "load file storage")
+		logger.Fatalw(err.Error(), "event", "create storage")
 	}
 	defer urlStorage.Finalize()
-
-	db := storage.InitDB(cfg.DBConnParams)
-	defer db.Close()
 
 	urlService := service.NewURLService(urlStorage)
 	handler := handler.NewURLHandler(urlService, cfg)
