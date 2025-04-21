@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -90,7 +91,7 @@ func TestGetHandler(t *testing.T) {
 	}
 }
 
-func TestPostCommonHandler(t *testing.T) {
+func TestPostStringHandler(t *testing.T) {
 	cfg := testutils.LoadTestConfig()
 	storage := mocks.NewStorageMock()
 
@@ -134,7 +135,7 @@ func TestPostCommonHandler(t *testing.T) {
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()
-			router.Post("/", handler.ProcessPostCommon)
+			router.Post("/", handler.ProcessPostURLString)
 
 			rqs := httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(test.rqsData))
 			rsp := httptest.NewRecorder()
@@ -216,9 +217,91 @@ func TestPostObjectHandler(t *testing.T) {
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()
-			router.Post("/api/shorten", handler.ProcessPostObject)
+			router.Post("/api/shorten", handler.ProcessPostURLObject)
 
 			rqs := httptest.NewRequest(http.MethodPost, "/api/shorten", bytes.NewBufferString(test.rqsData))
+			rqs.Header.Set("Content-Type", test.contentType)
+
+			rsp := httptest.NewRecorder()
+			router.ServeHTTP(rsp, rqs)
+
+			res := rsp.Result()
+			defer res.Body.Close()
+
+			assert.Equal(t, test.want.code, res.StatusCode)
+			resBody, _ := io.ReadAll(res.Body)
+			assert.Equal(t, test.want.rsp, string(resBody))
+		})
+	}
+}
+
+func TestPostBatchHandler(t *testing.T) {
+	cfg := testutils.LoadTestConfig()
+	storage := mocks.NewStorageMock()
+
+	type want struct {
+		code int
+		rsp  string
+	}
+	tests := []struct {
+		name        string
+		rqsData     string
+		contentType string
+		want        want
+	}{
+		{
+			name: "common",
+			rqsData: `[{"correlation_id" : "id1", "original_url" : "https://www.foo1.com"},
+			           {"correlation_id" : "id2", "original_url" : "https://www.foo2.com"}]`,
+			contentType: "application/json",
+			want: want{
+				code: 201,
+				rsp: strings.Join(strings.Fields(
+					`[{"correlation_id" : "id1", "short_url" : "http://localhost:8080/XTuTMq3X"},
+				      {"correlation_id" : "id2", "short_url" : "http://localhost:8080/FlT-CpRc"}]`), ""),
+			},
+		},
+		{
+			name:        "not arr",
+			rqsData:     `{"id1":"https://www.foo1.com"}`,
+			contentType: "application/json",
+			want: want{
+				code: 400,
+				rsp:  "invalid json\n",
+			},
+		},
+		{
+			name:        "empty arr",
+			contentType: "application/json",
+			rqsData:     "[]",
+			want: want{
+				code: 400,
+				rsp:  "empty batch\n",
+			},
+		},
+		{
+			name:        "not json",
+			rqsData:     "bar",
+			contentType: "plain/text",
+			want: want{
+				code: 400,
+				rsp:  "incorrect content type\n",
+			},
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			urlService := service.NewURLService(storage)
+			handler := NewURLHandler(urlService, &cfg)
+
+			router := chi.NewRouter()
+			router.Post("/api/shorten/batch", handler.ProcessPostURLBatch)
+
+			rqs := httptest.NewRequest(
+				http.MethodPost,
+				"/api/shorten/batch",
+				bytes.NewBufferString(test.rqsData),
+			)
 			rqs.Header.Set("Content-Type", test.contentType)
 
 			rsp := httptest.NewRecorder()

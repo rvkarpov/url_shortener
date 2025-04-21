@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -24,7 +25,8 @@ func NewURLHandler(urlService_ *service.URLService, cfg_ *config.Config) *URLHan
 	return &URLHandler{urlService: urlService_, cfg: cfg_}
 }
 
-func (handler *URLHandler) ProcessPostCommon(rsp http.ResponseWriter, rqs *http.Request) {
+func (handler *URLHandler) ProcessPostURLString(rsp http.ResponseWriter, rqs *http.Request) {
+	ctx := context.Background()
 	recvURL, err := urlutils.TryGetURLFromPostRqs(rqs)
 	log.Printf("New POST request with URL: %s", recvURL)
 	if err != nil {
@@ -32,7 +34,7 @@ func (handler *URLHandler) ProcessPostCommon(rsp http.ResponseWriter, rqs *http.
 		return
 	}
 
-	shortURL, err := handler.urlService.ProcessLongURL(recvURL)
+	shortURL, err := handler.urlService.ProcessLongURL(ctx, recvURL)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusInternalServerError)
 		return
@@ -43,7 +45,9 @@ func (handler *URLHandler) ProcessPostCommon(rsp http.ResponseWriter, rqs *http.
 	rsp.Write([]byte(fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL)))
 }
 
-func (handler *URLHandler) ProcessPostObject(rsp http.ResponseWriter, rqs *http.Request) {
+func (handler *URLHandler) ProcessPostURLObject(rsp http.ResponseWriter, rqs *http.Request) {
+	ctx := context.Background()
+
 	if rqs.Header.Get("Content-Type") != "application/json" {
 		http.Error(rsp, "incorrect content type", http.StatusBadRequest)
 		return
@@ -68,18 +72,86 @@ func (handler *URLHandler) ProcessPostObject(rsp http.ResponseWriter, rqs *http.
 
 	log.Printf("New POST request with URL: %s", origin.URL)
 
-	shortURL, err := handler.urlService.ProcessLongURL(origin.URL)
+	shortURL, err := handler.urlService.ProcessLongURL(ctx, origin.URL)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	log.Printf("Stored short URL: %s", shortURL)
-
 	short := ShortURLInfo{
 		Result: fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL),
 	}
 	out, err := json.Marshal(short)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+	}
+
+	rsp.Header().Add("Content-Type", "application/json")
+	rsp.WriteHeader(http.StatusCreated)
+	rsp.Write(out)
+}
+
+func (handler *URLHandler) ProcessPostURLBatch(rsp http.ResponseWriter, rqs *http.Request) {
+	ctx := context.Background()
+
+	if rqs.Header.Get("Content-Type") != "application/json" {
+		http.Error(rsp, "incorrect content type", http.StatusBadRequest)
+		return
+	}
+
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(rqs.Body)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Print("New POST request with URL batch")
+
+	var inputBatch []OriginURLBatchItem
+	if err = json.Unmarshal(buf.Bytes(), &inputBatch); err != nil {
+		http.Error(rsp, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	if len(inputBatch) == 0 {
+		http.Error(rsp, "empty batch", http.StatusBadRequest)
+		return
+	}
+
+	err = handler.urlService.BeginBatchProcessing(ctx)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	outputBatch := make([]ShortURLBatchItem, 0, len(inputBatch))
+
+	for _, item := range inputBatch {
+		log.Printf("New POST request with URL: %s", item.URL)
+		shortURL, err := handler.urlService.ProcessLongURL(ctx, item.URL)
+		if err != nil {
+			http.Error(rsp, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		outputBatch = append(
+			outputBatch,
+			ShortURLBatchItem{
+				ID:  item.ID,
+				URL: fmt.Sprintf("%s/%s", handler.cfg.PublishAddr, shortURL),
+			},
+		)
+	}
+
+	err = handler.urlService.EndBatchProcessing(ctx)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	out, err := json.Marshal(outputBatch)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusInternalServerError)
 	}
@@ -97,7 +169,7 @@ func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request
 
 	log.Printf("New GET request with short URL: %s", recvURL)
 
-	longURL, err := handler.urlService.ProcessShortURL(recvURL)
+	longURL, err := handler.urlService.ProcessShortURL(rqs.Context(), recvURL)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusBadRequest)
 		return
@@ -109,7 +181,7 @@ func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request
 
 func (handler *URLHandler) ProcessPing(db storage.DBState) http.HandlerFunc {
 	return func(rsp http.ResponseWriter, rqs *http.Request) {
-		if !db.Enabled {
+		if db.DB == nil {
 			http.Error(rsp, "DB disabled", http.StatusInternalServerError)
 			return
 		}

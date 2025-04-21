@@ -38,8 +38,9 @@ func main() {
 
 	logger.Infof("Server started on %s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)
 
-	handlePostString := middleware.Compress(middleware.Log(handler.ProcessPostCommon, logger))
-	handlePostObject := middleware.Compress(middleware.Log(handler.ProcessPostObject, logger))
+	handlePostString := middleware.Compress(middleware.Log(handler.ProcessPostURLString, logger))
+	handlePostObject := middleware.Compress(middleware.Log(handler.ProcessPostURLObject, logger))
+	handlePostBatch := middleware.Compress(middleware.Log(handler.ProcessPostURLBatch, logger))
 	handleGet := middleware.Compress(middleware.Log(handler.ProcessGet, logger))
 	handlePing := handler.ProcessPing(db)
 
@@ -47,6 +48,7 @@ func main() {
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", handlePostString)
 		router.Post("/api/shorten", handlePostObject)
+		router.Post("/api/shorten/batch", handlePostBatch)
 		router.Get("/ping", handlePing)
 		router.Get("/{URL}", handleGet)
 	})
