@@ -25,9 +25,12 @@ func main() {
 	cfg := config.LoadConfig()
 	urlStorage, err := storage.NewStorage(cfg.StorageFile)
 	if err != nil {
-		logger.Fatalw(err.Error(), "event", "load storage")
+		logger.Fatalw(err.Error(), "event", "load file storage")
 	}
 	defer urlStorage.Finalize()
+
+	db := storage.InitDB(cfg.DBConnParams)
+	defer db.Close()
 
 	urlService := service.NewURLService(urlStorage)
 	handler := handler.NewURLHandler(urlService, cfg)
@@ -37,11 +40,13 @@ func main() {
 	handlePostString := middleware.Compress(middleware.Log(handler.ProcessPostCommon, logger))
 	handlePostObject := middleware.Compress(middleware.Log(handler.ProcessPostObject, logger))
 	handleGet := middleware.Compress(middleware.Log(handler.ProcessGet, logger))
+	handlePing := handler.ProcessPing(db)
 
 	router := chi.NewRouter()
 	router.Route("/", func(router chi.Router) {
 		router.Post("/", handlePostString)
 		router.Post("/api/shorten", handlePostObject)
+		router.Get("/ping", handlePing)
 		router.Get("/{URL}", handleGet)
 	})
 
