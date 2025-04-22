@@ -31,10 +31,14 @@ func (service *URLService) ProcessLongURL(ctx context.Context, longURL string) (
 	return shortURL, err
 }
 
-func (service *URLService) ProcessShortURL(ctx context.Context, shortURL string) (string, error) {
+func (service *URLService) ProcessShortURL(ctx context.Context, shortURL string) (string, bool, error) {
 	return service.urlStorage.TryGetLongURL(ctx, shortURL)
 }
 
 func (service *URLService) GetSummary(ctx context.Context) string {
 	return service.urlStorage.GetSummary(ctx)
+}
+
+func (service *URLService) MarkAsDeleted(ctx context.Context, shortURLs []string) {
+	service.urlStorage.MarkAsDeleted(ctx, shortURLs)
 }

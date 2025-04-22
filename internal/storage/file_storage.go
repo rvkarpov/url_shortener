@@ -39,13 +39,17 @@ func (storage *FileStorage) StoreURL(ctx context.Context, shortURL, longURL stri
 	return nil
 }
 
-func (storage *FileStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, error) {
+func (storage *FileStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, bool, error) {
 	originalURL, exists := storage.urls[shortURL]
+	deleted := false
 	if !exists {
-		return "", errors.New("URL not found")
+		return "", deleted, errors.New("URL not found")
 	}
 
-	return originalURL, nil
+	return originalURL, deleted, nil
+}
+
+func (storage *FileStorage) MarkAsDeleted(ctx context.Context, shortURLs []string) {
 }
 
 func (storage *FileStorage) Finalize() {

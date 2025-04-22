@@ -206,11 +206,16 @@ func (handler *URLHandler) ProcessGet(rsp http.ResponseWriter, rqs *http.Request
 
 	log.Printf("New GET request with short URL: %s", recvURL)
 
-	longURL, err := handler.urlService.ProcessShortURL(rqs.Context(), recvURL)
+	longURL, deleted, err := handler.urlService.ProcessShortURL(rqs.Context(), recvURL)
 	if err != nil {
 		http.Error(rsp, err.Error(), http.StatusBadRequest)
 		return
 	}
+
+	if deleted {
+		rsp.WriteHeader(http.StatusGone)
+	}
+
 	log.Printf("Found original URL: %s", longURL)
 	rsp.Header().Set("Location", longURL)
 	rsp.WriteHeader(http.StatusTemporaryRedirect)
@@ -227,6 +232,36 @@ func (handler *URLHandler) ProcessGetSummary(rsp http.ResponseWriter, rqs *http.
 	rsp.Header().Add("Content-Type", "application/json")
 	rsp.WriteHeader(http.StatusOK)
 	rsp.Write([]byte(summary))
+}
+
+func (handler *URLHandler) ProcessDeleteUrls(rsp http.ResponseWriter, rqs *http.Request) {
+	if rqs.Header.Get("Content-Type") != "application/json" {
+		http.Error(rsp, "incorrect content type", http.StatusBadRequest)
+		return
+	}
+
+	var buf bytes.Buffer
+	_, err := buf.ReadFrom(rqs.Body)
+	if err != nil {
+		http.Error(rsp, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	log.Print("New DELETE request")
+
+	var shortURLs []string
+	if err = json.Unmarshal(buf.Bytes(), &shortURLs); err != nil {
+		http.Error(rsp, "invalid json", http.StatusBadRequest)
+		return
+	}
+
+	if len(shortURLs) == 0 {
+		http.Error(rsp, "empty batch", http.StatusBadRequest)
+		return
+	}
+
+	handler.urlService.MarkAsDeleted(rqs.Context(), shortURLs)
+	rsp.WriteHeader(http.StatusAccepted)
 }
 
 func (handler *URLHandler) ProcessPing(db storage.DBState) http.HandlerFunc {

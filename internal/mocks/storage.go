@@ -23,13 +23,17 @@ func (m *Mock) StoreURL(ctx context.Context, shortURL, longURL string) error {
 	return nil
 }
 
-func (m *Mock) TryGetLongURL(ctx context.Context, shortURL string) (string, error) {
+func (m *Mock) TryGetLongURL(ctx context.Context, shortURL string) (string, bool, error) {
 	originalURL, exists := m.urls[shortURL]
+	deleted := false
 	if !exists {
-		return "", errors.New("URL not found")
+		return "", deleted, errors.New("URL not found")
 	}
 
-	return originalURL, nil
+	return originalURL, deleted, nil
+}
+
+func (m *Mock) MarkAsDeleted(ctx context.Context, shortURLs []string) {
 }
 
 func (m *Mock) Finalize() {
