@@ -60,7 +60,7 @@ func Compress(h http.HandlerFunc) http.HandlerFunc {
 		if needUncompress {
 			gzr, err := newGzipReader(rqs)
 			if err != nil {
-				http.Error(rsp, err.Error(), http.StatusInternalServerError)
+
 				return
 			}
 			defer gzr.Close()

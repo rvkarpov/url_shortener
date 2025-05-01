@@ -43,6 +43,10 @@ func (m *Mock) EndTransaction(ctx context.Context) error {
 	return nil
 }
 
+func (m *Mock) GetSummary(ctx context.Context) string {
+	return ""
+}
+
 func (m *Mock) AddTestData(shortURL, longURL string) {
 	m.urls[shortURL] = longURL
 }

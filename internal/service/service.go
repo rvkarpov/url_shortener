@@ -34,3 +34,7 @@ func (service *URLService) ProcessLongURL(ctx context.Context, longURL string) (
 func (service *URLService) ProcessShortURL(ctx context.Context, shortURL string) (string, error) {
 	return service.urlStorage.TryGetLongURL(ctx, shortURL)
 }
+
+func (service *URLService) GetSummary(ctx context.Context) string {
+	return service.urlStorage.GetSummary(ctx)
+}

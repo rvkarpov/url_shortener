@@ -22,12 +22,15 @@ func main() {
 	defer logger_.Sync()
 	logger := logger_.Sugar()
 
-	cfg := config.LoadConfig()
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		logger.Fatalw(err.Error(), "event", "load config")
+	}
 
 	db := storage.ConnectToDB(cfg.DBConnParams)
 	defer db.Close()
 
-	urlStorage, err := storage.NewURLStorage(&db, *cfg)
+	urlStorage, err := storage.NewURLStorage(&db, cfg)
 	if err != nil {
 		logger.Fatalw(err.Error(), "event", "create storage")
 	}
@@ -38,10 +41,15 @@ func main() {
 
 	logger.Infof("Server started on %s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)
 
-	handlePostString := middleware.Compress(middleware.Log(handler.ProcessPostURLString, logger))
-	handlePostObject := middleware.Compress(middleware.Log(handler.ProcessPostURLObject, logger))
-	handlePostBatch := middleware.Compress(middleware.Log(handler.ProcessPostURLBatch, logger))
-	handleGet := middleware.Compress(middleware.Log(handler.ProcessGet, logger))
+	handleChain := func(h http.HandlerFunc) http.HandlerFunc {
+		return middleware.Authorize(middleware.Compress(middleware.Log(h, logger)), logger, cfg.SecretKey)
+	}
+
+	handlePostString := handleChain(handler.ProcessPostURLString)
+	handlePostObject := handleChain(handler.ProcessPostURLObject)
+	handlePostBatch := handleChain(handler.ProcessPostURLBatch)
+	handleGet := handleChain(handler.ProcessGet)
+	handleGetSummary := handleChain(handler.ProcessGetSummary)
 	handlePing := handler.ProcessPing(db)
 
 	router := chi.NewRouter()
@@ -49,6 +57,7 @@ func main() {
 		router.Post("/", handlePostString)
 		router.Post("/api/shorten", handlePostObject)
 		router.Post("/api/shorten/batch", handlePostBatch)
+		router.Get("/api/user/urls", handleGetSummary)
 		router.Get("/ping", handlePing)
 		router.Get("/{URL}", handleGet)
 	})

@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -40,13 +41,13 @@ func ConnectToDB(connParams string) DBState {
 
 type DBStorage struct {
 	state *DBState
-	cfg   config.Config
+	cfg   *config.Config
 }
 
 func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
 	query := fmt.Sprintf(
-		`INSERT INTO %s (longURL, shortURL) 
-		VALUES ($1, $2) 
+		`INSERT INTO %s (userID, longURL, shortURL) 
+		VALUES ($1, $2, $3) 
 		ON CONFLICT (shortURL) 
 		DO NOTHING 
 		RETURNING id;`,
@@ -56,10 +57,16 @@ func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string
 	var err error
 	var result sql.Result
 
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return err
+	}
+
 	if storage.state.Tx != nil {
 		result, err = storage.state.Tx.ExecContext(
 			ctx,
 			query,
+			userID,
 			longURL,
 			shortURL,
 		)
@@ -75,6 +82,7 @@ func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string
 		result, err = storage.state.DB.ExecContext(
 			ctx,
 			query,
+			userID,
 			longURL,
 			shortURL,
 		)
@@ -149,14 +157,62 @@ func (storage *DBStorage) EndTransaction(ctx context.Context) error {
 	return nil
 }
 
-func NewDBStorage(state *DBState, cfg config.Config) (*DBStorage, error) {
+func (storage *DBStorage) GetSummary(ctx context.Context) string {
+	userID, err := getUserID(ctx)
+	if err != nil {
+		return ""
+	}
+
+	query := fmt.Sprintf(
+		`SELECT shortURL, longURL FROM %s WHERE userID = $1`,
+		pq.QuoteIdentifier(storage.cfg.TableName),
+	)
+
+	rows, err := storage.state.DB.QueryContext(ctx, query, userID)
+	if err != nil {
+		return ""
+	}
+
+	defer rows.Close()
+
+	urls := make([]UserDataStorageItem, 0)
+	for rows.Next() {
+		var item UserDataStorageItem
+		err = rows.Scan(&item.ShortURL, &item.LongURL)
+		if err != nil {
+			return ""
+		}
+
+		item.ShortURL = fmt.Sprintf("%s/%s", storage.cfg.PublishAddr, item.ShortURL)
+		urls = append(urls, item)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		return ""
+	}
+
+	if len(urls) == 0 {
+		return ""
+	}
+
+	result, err := json.Marshal(urls)
+	if err != nil {
+		return ""
+	}
+
+	return string(result)
+}
+
+func NewDBStorage(state *DBState, cfg *config.Config) (*DBStorage, error) {
 	if state.DB == nil {
 		return nil, errors.New("database is not available")
 	}
 
 	createTable := `
 		CREATE TABLE IF NOT EXISTS %s ( 
-		id SERIAL PRIMARY KEY, 
+		id SERIAL PRIMARY KEY,
+		userID TEXT NOT NULL,
 		longURL TEXT UNIQUE NOT NULL, 
 		shortURL VARCHAR(%d) UNIQUE NOT NULL,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`
