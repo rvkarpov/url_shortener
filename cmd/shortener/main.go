@@ -50,6 +50,7 @@ func main() {
 	handlePostBatch := handleChain(handler.ProcessPostURLBatch)
 	handleGet := handleChain(handler.ProcessGet)
 	handleGetSummary := handleChain(handler.ProcessGetSummary)
+	handleDeleteUrls := handleChain(handler.ProcessDeleteUrls)
 	handlePing := handler.ProcessPing(db)
 
 	router := chi.NewRouter()
@@ -60,6 +61,7 @@ func main() {
 		router.Get("/api/user/urls", handleGetSummary)
 		router.Get("/ping", handlePing)
 		router.Get("/{URL}", handleGet)
+		router.Delete("/api/user/urls", handleDeleteUrls)
 	})
 
 	params := fmt.Sprintf("%s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)

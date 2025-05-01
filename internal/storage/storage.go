@@ -8,7 +8,8 @@ import (
 
 type URLStorage interface {
 	StoreURL(ctx context.Context, shortURL, longURL string) error
-	TryGetLongURL(ctx context.Context, shortURL string) (string, error)
+	TryGetLongURL(ctx context.Context, shortURL string) (string, bool, error)
+	MarkAsDeleted(ctx context.Context, shortURL []string)
 	Finalize()
 
 	BeginTransaction(ctx context.Context) error

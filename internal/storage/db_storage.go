@@ -40,8 +40,9 @@ func ConnectToDB(connParams string) DBState {
 }
 
 type DBStorage struct {
-	state *DBState
-	cfg   *config.Config
+	state     *DBState
+	cfg       *config.Config
+	deleteCmd *DeleteCmd
 }
 
 func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
@@ -54,14 +55,12 @@ func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string
 		pq.QuoteIdentifier(storage.cfg.TableName),
 	)
 
-	var err error
-	var result sql.Result
-
 	userID, err := getUserID(ctx)
 	if err != nil {
 		return err
 	}
 
+	var result sql.Result
 	if storage.state.Tx != nil {
 		result, err = storage.state.Tx.ExecContext(
 			ctx,
@@ -104,30 +103,41 @@ func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string
 	return nil
 }
 
-func (storage *DBStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, error) {
+func (storage *DBStorage) TryGetLongURL(ctx context.Context, shortURL string) (string, bool, error) {
 	query := fmt.Sprintf(
-		`SELECT longURL FROM %s WHERE shortURL = $1 LIMIT 1`,
+		`SELECT longURL, deletedFlag FROM %s WHERE shortURL = $1 LIMIT 1`,
 		pq.QuoteIdentifier(storage.cfg.TableName),
 	)
 
 	var longURL string
+	var deleted bool
 	err := storage.state.DB.QueryRowContext(
 		ctx,
 		query,
 		shortURL,
-	).Scan(&longURL)
+	).Scan(&longURL, &deleted)
 
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return "", fmt.Errorf("short URL '%s' not found", shortURL)
+			return "", deleted, fmt.Errorf("short URL '%s' not found", shortURL)
 		}
-		return "", fmt.Errorf("database error: %w", err)
+		return "", deleted, fmt.Errorf("database error: %w", err)
 	}
 
-	return longURL, nil
+	return longURL, deleted, nil
+}
+
+func (storage *DBStorage) MarkAsDeleted(ctx context.Context, shortURLs []string) {
+	userID, err := getUserID(ctx)
+	if err != nil || userID == "" {
+		return
+	}
+
+	storage.deleteCmd.Append(userID, shortURLs)
 }
 
 func (storage *DBStorage) Finalize() {
+	storage.deleteCmd.Finalize()
 }
 
 func (storage *DBStorage) BeginTransaction(ctx context.Context) error {
@@ -215,6 +225,7 @@ func NewDBStorage(state *DBState, cfg *config.Config) (*DBStorage, error) {
 		userID TEXT NOT NULL,
 		longURL TEXT UNIQUE NOT NULL, 
 		shortURL VARCHAR(%d) UNIQUE NOT NULL,
+		deletedFlag BOOLEAN NOT NULL DEFAULT FALSE,
 		created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);`
 
 	_, err := state.DB.ExecContext(
@@ -229,5 +240,5 @@ func NewDBStorage(state *DBState, cfg *config.Config) (*DBStorage, error) {
 		return nil, err
 	}
 
-	return &DBStorage{state: state, cfg: cfg}, nil
+	return &DBStorage{state: state, cfg: cfg, deleteCmd: NewDeleteCmd(state, cfg)}, nil
 }
