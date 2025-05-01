@@ -15,6 +15,10 @@ type DBState struct {
 	Tx *sql.Tx
 }
 
+type DuplicateError struct {
+	Err error
+}
+
 func (state *DBState) Close() {
 	if state.DB != nil {
 		state.DB.Close()
@@ -41,14 +45,19 @@ type DBStorage struct {
 
 func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string) error {
 	query := fmt.Sprintf(
-		`INSERT INTO %s (longURL, shortURL) VALUES ($1, $2)`,
+		`INSERT INTO %s (longURL, shortURL) 
+		VALUES ($1, $2) 
+		ON CONFLICT (shortURL) 
+		DO NOTHING 
+		RETURNING id;`,
 		pq.QuoteIdentifier(storage.cfg.TableName),
 	)
 
 	var err error
+	var result sql.Result
 
 	if storage.state.Tx != nil {
-		_, err = storage.state.Tx.ExecContext(
+		result, err = storage.state.Tx.ExecContext(
 			ctx,
 			query,
 			longURL,
@@ -63,7 +72,7 @@ func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string
 		}
 
 	} else {
-		_, err = storage.state.DB.ExecContext(
+		result, err = storage.state.DB.ExecContext(
 			ctx,
 			query,
 			longURL,
@@ -74,6 +83,16 @@ func (storage *DBStorage) StoreURL(ctx context.Context, shortURL, longURL string
 	if err != nil {
 		return fmt.Errorf("failed to insert URL: %w", err)
 	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %v", err)
+	}
+
+	if rowsAffected == 0 {
+		return NewDuplicateURLError(shortURL)
+	}
+
 	return nil
 }
 

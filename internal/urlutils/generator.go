@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-func GenerateShortURL(longURL string) string {
+func GenerateShortURL(longURL string, len uint) string {
 	hash := md5.Sum([]byte(longURL))
 	encoded := base64.URLEncoding.EncodeToString(hash[:])
-	return strings.TrimRight(encoded, "=")[:8]
+	return strings.TrimRight(encoded, "=")[:len]
 }

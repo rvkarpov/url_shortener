@@ -70,7 +70,7 @@ func TestGetHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			urlService := service.NewURLService(storage)
+			urlService := service.NewURLService(storage, &cfg)
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()
@@ -131,7 +131,7 @@ func TestPostStringHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			urlService := service.NewURLService(storage)
+			urlService := service.NewURLService(storage, &cfg)
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()
@@ -213,7 +213,7 @@ func TestPostObjectHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			urlService := service.NewURLService(storage)
+			urlService := service.NewURLService(storage, &cfg)
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()
@@ -291,7 +291,7 @@ func TestPostBatchHandler(t *testing.T) {
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			urlService := service.NewURLService(storage)
+			urlService := service.NewURLService(storage, &cfg)
 			handler := NewURLHandler(urlService, &cfg)
 
 			router := chi.NewRouter()

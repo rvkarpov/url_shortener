@@ -33,7 +33,7 @@ func main() {
 	}
 	defer urlStorage.Finalize()
 
-	urlService := service.NewURLService(urlStorage)
+	urlService := service.NewURLService(urlStorage, cfg)
 	handler := handler.NewURLHandler(urlService, cfg)
 
 	logger.Infof("Server started on %s:%d", cfg.LaunchAddr.Host, cfg.LaunchAddr.Port)
